@@ -14,12 +14,15 @@ const Effect = (f) => ({
 Effect.of = a => Effect(() => a);
 
 
+// TODO Async functions return promises, which screw up chaining
 const AsyncEffect = (f) => ({
 
     map: g => AsyncEffect(async () => await g(await f())),
 
+    // can we extend native promises to make this more chainable?
     run: async () => await f(),
 
+    // can we extend native promises to make this more chainable?
     join: async () => await f(),
 
     chain: async g => await AsyncEffect(f).map(g).join(),
