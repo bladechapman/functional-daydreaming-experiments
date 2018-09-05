@@ -1,86 +1,48 @@
 // Example: Network requests
 window.onload = async () => {
     // Pure functions
-    const assignInnerHTMLToElement = element => innerHTML => {
-        element.innerHTML = innerHTML;
-        return element;
-    };
     const appendChild = parent => child => parent.appendChild(child);
     const getElementById = doc => idString => doc.getElementById(idString);
-    const wrappingElement = document.createElement('div');
+    const yieldWrappingElement = doc => doc.createElement('div');
     const yieldFirstComponent = PromiseConstructor => timeoutUtility => ({
-        content: 'first component',
+        content: '<div>do something</div>',
         state: new PromiseConstructor((res, rej) => {
-            timeoutUtility(() => res({ newState: 'some new state' }), 1000)
+            const button = document.createElement('button');
+            button.innerHTML = 'temporary button thingy';
+            document.body.appendChild(button);
+            button.onclick = () => res({ newState: 'first component state' });
         })
     });
-    const logStep = logger => loggee => { logger.log(loggee) }
+    const yieldSecondComponent = PromiseConstructor => timeoutUtility => ({
+        content: '<div>This is inside another div</div>',
+        state: new PromiseConstructor((res, rej) => {
+            timeoutUtility(() => res({ newState: 'second component state' }), 1000)
+        })
+    });
+
+    // this function seems dangerous...
     const assignComponentToWrapper = wrapper => component => {
-        const assignInnerHtmlToWrapper = AsyncEffect.of(wrapper).map(assignInnerHTMLToElement);
-        return AsyncEffect.of(component.content)
-            .ap(assignInnerHtmlToWrapper)
-            .chain(async () => await component.state);
+        wrapper.innerHTML = component.content;
+        return component.state;
     }
 
     // Pure program
-    const asyncGetElementByIdFromDocumentEffect = AsyncEffect.of(window.document).map(getElementById);
-    const asyncAppendChildToTestBodyEffect = AsyncEffect.of('testbody').ap(asyncGetElementByIdFromDocumentEffect).map(appendChild);
-    const yieldFirstComponentEffect = AsyncEffect.of(setTimeout).ap(AsyncEffect.of(Promise).map(yieldFirstComponent));
+    const asyncAppendChildToTestBodyEffect = AsyncEffect.of('testbody').ap(AsyncEffect.of(window.document).map(getElementById)).map(appendChild);
+    const rootElementEffect = AsyncEffect.of(window.document).map(yieldWrappingElement);
+    const firstComponentEffect = AsyncEffect.of(setTimeout).ap(AsyncEffect.of(Promise).map(yieldFirstComponent));
+    const secondComponentEffect = AsyncEffect.of(setTimeout).ap(AsyncEffect.of(Promise).map(yieldSecondComponent));
 
-//     const firstComponentStep = wrapper => {
-//         const assignComponentToGivenWrapper = AsyncEffect.of(wrapper).map(assignComponentToWrapper);
-//         return yieldFirstComponentEffect.ap(assignComponentToGivenWrapper);
-//     }
+    const firstComponentStep = firstComponentEffect.ap(rootElementEffect.map(assignComponentToWrapper))
+    const secondComponentStep = secondComponentEffect.ap(rootElementEffect.map(assignComponentToWrapper))
 
-    /**
-     * @define Component<b, c> {content: b, state: c}
-     *
-     * @param {a} wrapper
-     * @param {a -> Component<b, c> -> AsyncEffect<c>} assignComponentToWrapper
-     * @param {AsyncEffect<Component<b, c>>} yieldComponentEffect
-     * @return {AsyncEffect<c>}
-     */
-    const componentStep = wrapper => assignComponentToWrapper_2 => yieldComponentEffect => {
-        const assignComponentToGivenWrapper = AsyncEffect.of(wrapper).map(assignComponentToWrapper_2);
-        return yieldComponentEffect.ap(assignComponentToGivenWrapper).join();
-    }
+    const program = rootElementEffect.ap(asyncAppendChildToTestBodyEffect)
+        .map(async rootElement => {
+            const firstComponentStep = firstComponentEffect.ap(AsyncEffect.of(rootElement).map(assignComponentToWrapper));
+            const secondComponentStep = secondComponentEffect.ap(AsyncEffect.of(rootElement).map(assignComponentToWrapper));
 
-    const firstComponentStep = await
-        AsyncEffect.of(yieldFirstComponentEffect).ap(
-            AsyncEffect.of(assignComponentToWrapper).ap(
-                AsyncEffect.of(wrappingElement).map(componentStep)
-            )
-        );
+            await firstComponentStep.run();
+            await secondComponentStep.run();
+        })
 
-    // TESTING
-    // await AsyncEffect.of(wrappingElement).ap(asyncAppendChildToTestBodyEffect).run()
-    // const test = await firstComponentStep.run()
-    // const test2 = await test.run()
-    // console.log(test2)
-
-    const test = await
-        (
-            await AsyncEffect.of(wrappingElement).ap(asyncAppendChildToTestBodyEffect)
-                
-                .chain(() => firstComponentStep)
-        )
-
-        .run()
-
-    console.log(test)
-
-    // const test2 = await firstComponentStep.run();
-    // console.log(test2)
-    // TESTING
-
-
-    const consoleLogEffect = AsyncEffect.of(console).map(logStep);
-
-//     // Effectful execution
-//     AsyncEffect.of(wrappingElement)
-//         .ap(asyncAppendChildToTestBodyEffect)
-//         .map(firstComponentStep)
-//         .ap(consoleLogEffect)
-//         .run()
-
+    program.run();
 }
