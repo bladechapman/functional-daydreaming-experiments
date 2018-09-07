@@ -1,5 +1,10 @@
 // Example: Network requests
 window.onload = async () => {
+    // Some setup, we’ll ignore that this is impure...
+    const div = document.createElement('div');
+    div.id = 'testbody';
+    document.body.appendChild(div);
+
     // Pure functions
     const appendChild = parent => child => parent.appendChild(child);
     const getElementById = doc => idString => doc.getElementById(idString);
