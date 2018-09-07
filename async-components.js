@@ -5,44 +5,43 @@ window.onload = async () => {
     const getElementById = doc => idString => doc.getElementById(idString);
     const yieldWrappingElement = doc => doc.createElement('div');
     const yieldFirstComponent = PromiseConstructor => timeoutUtility => ({
-        content: '<div>do something</div>',
+        content: '<div>First component</div>',
         state: new PromiseConstructor((res, rej) => {
-            const button = document.createElement('button');
-            button.innerHTML = 'temporary button thingy';
-            document.body.appendChild(button);
-            button.onclick = () => res({ newState: 'first component state' });
+            timeoutUtility(() => res({ newState: 'first component state' }), 1000)
         })
     });
     const yieldSecondComponent = PromiseConstructor => timeoutUtility => ({
-        content: '<div>This is inside another div</div>',
+        content: '<div>Second component</div>',
         state: new PromiseConstructor((res, rej) => {
             timeoutUtility(() => res({ newState: 'second component state' }), 1000)
         })
     });
-
-    // this function seems dangerous...
     const assignComponentToWrapper = wrapper => component => {
-        wrapper.innerHTML = component.content;
-        return component.state;
+        return AsyncEffect.of(() => {
+            wrapper.innerHTML = component.content;
+            return component.state;
+        });
     }
 
     // Pure program
-    const asyncAppendChildToTestBodyEffect = AsyncEffect.of('testbody').ap(AsyncEffect.of(window.document).map(getElementById)).map(appendChild);
-    const rootElementEffect = AsyncEffect.of(window.document).map(yieldWrappingElement);
     const firstComponentEffect = AsyncEffect.of(setTimeout).ap(AsyncEffect.of(Promise).map(yieldFirstComponent));
     const secondComponentEffect = AsyncEffect.of(setTimeout).ap(AsyncEffect.of(Promise).map(yieldSecondComponent));
+    const rootElementEffect = AsyncEffect.of(window.document).map(yieldWrappingElement);
+    const asyncAppendChildToTestBodyEffect = AsyncEffect.of('testbody').ap(AsyncEffect.of(window.document).map(getElementById)).map(appendChild);
 
-    const firstComponentStep = firstComponentEffect.ap(rootElementEffect.map(assignComponentToWrapper))
-    const secondComponentStep = secondComponentEffect.ap(rootElementEffect.map(assignComponentToWrapper))
+    const workflow = async rootElement => {
+        const firstComponentStep = await firstComponentEffect.ap(AsyncEffect.of(rootElement).map(assignComponentToWrapper)).join();
+        const secondComponentStep = await secondComponentEffect.ap(AsyncEffect.of(rootElement).map(assignComponentToWrapper)).join();
 
-    const program = rootElementEffect.ap(asyncAppendChildToTestBodyEffect)
-        .map(async rootElement => {
-            const firstComponentStep = firstComponentEffect.ap(AsyncEffect.of(rootElement).map(assignComponentToWrapper));
-            const secondComponentStep = secondComponentEffect.ap(AsyncEffect.of(rootElement).map(assignComponentToWrapper));
+        // Can I make it so that the steps take state & return state?
+        return AsyncEffect.of(() => {})
+            .ap(firstComponentStep)
+            .ap(secondComponentStep);
+    }
 
-            await firstComponentStep.run();
-            await secondComponentStep.run();
-        })
-
+    // Effectful execution
+    const program = await rootElementEffect
+        .ap(asyncAppendChildToTestBodyEffect)
+        .chain(workflow);
     program.run();
 }
