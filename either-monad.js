@@ -12,13 +12,14 @@ const Either = {
     Left: a => ({
 
         // "A value which has a Functor must provide a map method."
-        map: f => Either.Left(a),
+        map: () => Either.Left(a),
 
         // "A value which has an Apply must provide an ap method."
-        ap: apply => Either.Left(a),
+        ap: () => Either.Left(a),
 
         // "A value which has a Chain must provide a chain method"
-        // chain:
+        chain: () => Either.Left(a),
+        join: () => a
     }),
 
     Right: a => ({
@@ -30,9 +31,19 @@ const Either = {
         ap: apply => apply.map(f => f(a)),
 
         // "A value which has a Chain must provide a chain method"
-        // chain:
+        chain: f => Either.Right(a).map(f).join(),
+        join: () => a
     })
 };
 
 // A value which has an Applicative must provide an of function on its type representative
 Either.of = a => Either.Right(a);
+
+
+const test = Either.of('some-value').chain(val =>{
+    const jsType = typeof val;
+    if (jsType === 'string') return Either.Right(jsType)
+    else return Either.Left(jsType);
+});
+
+console.log(test)
